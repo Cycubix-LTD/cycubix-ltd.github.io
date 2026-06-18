@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deploy MultiJuicer on DigitalOcean — Cycubix Docs</title>
+  <meta name="description" content="A beginner-friendly, hands-on guide to deploying MultiJuicer (multi-tenant OWASP Juice Shop) on DigitalOcean Kubernetes for security workshops and CTFs. Covers doctl, Helm, kubectl, LoadBalancer, TLS, and Cloudflare.">
+  <meta name="keywords" content="MultiJuicer, OWASP Juice Shop, DigitalOcean, Kubernetes, Helm, security training, CTF, secure coding, Cycubix">
+  <meta name="author" content="Cycubix Ltd">
+  <link rel="canonical" href="https://docs.cycubix.com/multijuicer-on-digitalocean/">
+
+  <!-- Open Graph / Social -->
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Deploy MultiJuicer on DigitalOcean — Cycubix Docs">
+  <meta property="og:description" content="A beginner-friendly, hands-on guide to deploying MultiJuicer (multi-tenant OWASP Juice Shop) on DigitalOcean Kubernetes.">
+  <meta property="og:url" content="https://docs.cycubix.com/multijuicer-on-digitalocean/">
+  <meta property="og:site_name" content="Cycubix Docs">
+  <meta property="og:image" content="https://cdn.prod.website-files.com/6788e2dd8dc04f8c75b681c7/67a9bac5b3e31a467f492d40_74717b4c909b8d43e1884019fec46e1e_logo-cycubix-light.svg">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Deploy MultiJuicer on DigitalOcean — Cycubix Docs">
+  <meta name="twitter:description" content="Hands-on guide to deploying MultiJuicer on DigitalOcean Kubernetes.">
+
+  <meta name="robots" content="index, follow">
+  <link rel="icon" href="https://cdn.prod.website-files.com/6788e2dd8dc04f8c75b681c7/678ec72c0370a0b8c8a77a47_favicon-cycubix.png" type="image/png">
+
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-3BXPWQD6L8"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-3BXPWQD6L8');
+  </script>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f5f5f5;
+      color: #222;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.6;
+    }
+
+    /* Header */
+    header {
+      background: #111;
+      color: white;
+      padding: 2.5rem 2rem 3.5rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    header::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 4px;
+      background: #ffbe18;
+    }
+    .logo { height: 40px; margin-bottom: 1rem; }
+    header h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.4rem; letter-spacing: -0.02em; }
+    header h1 span { color: #ffbe18; }
+    header p { font-size: 1rem; opacity: 0.75; max-width: 600px; margin: 0 auto; line-height: 1.5; }
+    .breadcrumb { font-size: 0.82rem; opacity: 0.7; margin-bottom: 1.2rem; }
+    .breadcrumb a { color: #ffbe18; text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
+
+    /* Main */
+    main {
+      max-width: 860px;
+      margin: -1.5rem auto 2rem;
+      padding: 2rem 2.2rem;
+      flex: 1;
+      width: 100%;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      border: 1px solid #e8e8e8;
+      border-top: 3px solid #ffbe18;
+    }
+
+    h2.section-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin: 2.2rem 0 0.9rem;
+      color: #111;
+      border-left: 4px solid #ffbe18;
+      padding-left: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    h3 { font-size: 1.05rem; color: #111; margin: 1.4rem 0 0.5rem; }
+    p { margin: 0.6rem 0; font-size: 0.95rem; color: #333; }
+    ul, ol { margin: 0.6rem 0 0.6rem 1.4rem; font-size: 0.95rem; color: #333; }
+    li { margin: 0.3rem 0; }
+    a { color: #b58600; }
+
+    code {
+      font-family: Consolas, Monaco, "Courier New", monospace;
+      background: #f0f0f0;
+      color: #b1361e;
+      padding: 0.1rem 0.35rem;
+      border-radius: 3px;
+      font-size: 0.86em;
+    }
+    pre {
+      background: #11152b;
+      color: #e6e6f0;
+      padding: 1rem 1.1rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 0.8rem 0;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
+    pre .c { color: #7c8db5; }
+    pre .o { color: #7cf6d0; }
+
+    .callout {
+      border-left: 4px solid #ffbe18;
+      background: #fff8e1;
+      padding: 0.9rem 1.1rem;
+      border-radius: 0 6px 6px 0;
+      margin: 1rem 0;
+      font-size: 0.92rem;
+    }
+    .callout.warn { border-left-color: #e05757; background: #fdecec; }
+    .callout strong { color: #111; }
+
+    table { border-collapse: collapse; width: 100%; margin: 0.8rem 0; font-size: 0.9rem; }
+    th, td { text-align: left; padding: 0.55rem 0.7rem; border-bottom: 1px solid #eaeaea; }
+    th { background: #fafafa; font-weight: 700; color: #111; }
+
+    .step-tag {
+      display: inline-block;
+      background: #ffbe18;
+      color: #111;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.18rem 0.6rem;
+      border-radius: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      vertical-align: middle;
+      margin-right: 0.5rem;
+    }
+    hr { border: none; border-top: 1px solid #eaeaea; margin: 2rem 0; }
+    .meta { font-size: 0.82rem; color: #888; margin-top: 0.4rem; }
+
+    footer {
+      background: #111;
+      color: #aaa;
+      text-align: center;
+      padding: 1.5rem 2rem;
+      font-size: 0.82rem;
+    }
+    footer a { color: #ffbe18; text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+    footer .footer-links { margin-top: 0.4rem; }
+    footer .footer-links a { margin: 0 0.75rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <img class="logo" src="https://cdn.prod.website-files.com/6788e2dd8dc04f8c75b681c7/67a9bac5b3e31a467f492d40_74717b4c909b8d43e1884019fec46e1e_logo-cycubix-light.svg" alt="Cycubix">
+    <div class="breadcrumb"><a href="/">Cycubix Docs</a> &nbsp;/&nbsp; Deploy MultiJuicer on DigitalOcean</div>
+    <h1>Deploy MultiJuicer on DigitalOcean <span>&amp;</span></h1>
+    <p>A beginner's guide to running multi-tenant OWASP Juice Shop on Kubernetes — for security workshops, training, and CTFs.</p>
+  </header>
+
+  <main>
+    <p class="meta">Based on the <a href="https://github.com/juice-shop/multi-juicer/blob/main/guides/digital-ocean/digital-ocean.md">official MultiJuicer DigitalOcean guide</a>, expanded with explanations, real command output, and troubleshooting from an actual deployment (MultiJuicer 10.1.0, Kubernetes 1.36).</p>
+
+    <h2 class="section-title">What you'll build</h2>
+    <p>MultiJuicer lets you run <strong>one Juice Shop instance per team</strong> behind a single URL, so a whole class or CTF group can hack their own copy without spinning up servers by hand. By the end you'll have a managed Kubernetes cluster on DigitalOcean, MultiJuicer installed via Helm, a public HTTPS URL on your own domain, and an admin dashboard to watch every team.</p>
+    <p><strong>Time required:</strong> ~30–45 minutes (most of it waiting for the cluster to provision).</p>
+
+    <div class="callout warn">
+      <strong>⚠️ Cost warning.</strong> The resources here cost roughly <strong>$45–75/month</strong> if left running. DigitalOcean bills <strong>hourly</strong>, so a short test session costs only a few cents — but you must <strong>delete everything</strong> when you're done (see Step 6). Set a reminder.
+    </div>
+
+    <table>
+      <tr><th>Resource</th><th>Approx. monthly cost</th></tr>
+      <tr><td>Kubernetes control plane</td><td>Free (standard)</td></tr>
+      <tr><td>3× <code>s-2vcpu-4gb</code> worker nodes</td><td>~$48</td></tr>
+      <tr><td>Regional LoadBalancer</td><td>~$12</td></tr>
+    </table>
+
+    <h2 class="section-title">The tools</h2>
+    <ul>
+      <li><strong>doctl</strong> — DigitalOcean's CLI; talks to your account to create and delete resources.</li>
+      <li><strong>kubectl</strong> — the standard tool for talking to any Kubernetes cluster.</li>
+      <li><strong>helm</strong> — a package manager for Kubernetes; installs MultiJuicer in one command.</li>
+    </ul>
+
+    <h2 class="section-title">Prerequisites</h2>
+    <h3>1. DigitalOcean account + API token</h3>
+    <p>In the DigitalOcean console go to <strong>API → Tokens → Generate New Token</strong> (full access). Copy it — you only see it once, and you can revoke it when finished.</p>
+    <h3>2. Install the CLI tools</h3>
+    <p><strong>macOS (Homebrew):</strong></p>
+    <pre><code>brew install doctl kubectl helm</code></pre>
+    <p><strong>Linux:</strong> download each binary from its release page (doctl, kubectl, helm), then verify:</p>
+    <pre><code>doctl version
+kubectl version --client
+helm version</code></pre>
+    <h3>3. Authenticate doctl</h3>
+    <pre><code>doctl auth init      <span class="c"># paste your API token</span>
+doctl account get    <span class="c"># confirms your account email</span></code></pre>
+
+    <h2 class="section-title"><span class="step-tag">Step 1</span> Create the Kubernetes cluster</h2>
+    <p>One command creates a managed cluster. <strong>Important:</strong> the default node size (<code>s-1vcpu-2gb</code>) is too small for MultiJuicer — start with <code>s-2vcpu-4gb</code> to avoid a rebuild.</p>
+    <pre><code>doctl kubernetes cluster create juicy-k8s --size s-2vcpu-4gb</code></pre>
+    <p>This takes about 5–7 minutes; <code>doctl</code> then points <code>kubectl</code> at the new cluster automatically. Verify:</p>
+    <pre><code>kubectl config current-context   <span class="c"># do-nyc1-juicy-k8s</span>
+kubectl get nodes                <span class="c"># 3 nodes, all Ready</span></code></pre>
+
+    <h2 class="section-title"><span class="step-tag">Step 2</span> Install MultiJuicer with Helm</h2>
+    <pre><code>helm install multi-juicer oci://ghcr.io/juice-shop/multi-juicer/helm/multi-juicer</code></pre>
+    <p>Watch the pod start, and wait until it shows <code>1/1 Running</code> — that's the MultiJuicer "balancer", the brain that hands each team its own Juice Shop.</p>
+    <pre><code>kubectl get pods
+<span class="c"># multi-juicer-58c4746bbd-g4xgq   1/1   Running</span></code></pre>
+
+    <div class="callout">
+      <strong>Troubleshooting — pod stuck in <code>Pending</code>.</strong> If <code>kubectl describe pod multi-juicer-&lt;suffix&gt;</code> shows <em>"0/3 nodes are available: 3 Insufficient cpu"</em>, your nodes are too small. The pod requests 400m CPU; <code>s-1vcpu-2gb</code> nodes lack the headroom after system pods. Recreate the cluster with <code>--size s-2vcpu-4gb</code> and re-run the Helm install (which is why Step 1 uses the larger size).
+    </div>
+
+    <h2 class="section-title"><span class="step-tag">Step 3</span> Verify locally &amp; log in as admin</h2>
+    <p>Before exposing it, test with a port-forward — a temporary tunnel from your machine to the cluster:</p>
+    <pre><code>kubectl port-forward service/multi-juicer 8080:8080</code></pre>
+    <p>Open <code>http://localhost:8080</code>, create a team, and click <strong>Start Hacking</strong> to get a personal Juice Shop. The admin dashboard lives at <code>/balancer</code> (log in as team <code>admin</code>). The admin password is auto-generated and stored in a Kubernetes secret:</p>
+    <pre><code>kubectl get secrets multi-juicer-secret \
+  -o=jsonpath='{.data.adminPassword}' | base64 --decode</code></pre>
+
+    <h2 class="section-title"><span class="step-tag">Step 4</span> Expose it on your domain</h2>
+    <p>A port-forward only works on your machine. To give teams a real URL, add a <strong>LoadBalancer</strong> — a DigitalOcean appliance with a public IP that routes traffic into the cluster. How you handle HTTPS depends on where your DNS lives.</p>
+
+    <h3>Path A — Domain managed by DigitalOcean</h3>
+    <p>DigitalOcean can issue a free Let's Encrypt certificate and terminate HTTPS on the LoadBalancer:</p>
+    <pre><code>doctl compute certificate create --type lets_encrypt \
+  --name multijuicer-cert --dns-names mj.yourdomain.com
+doctl compute certificate list                <span class="c"># note the cert ID</span>
+wget https://raw.githubusercontent.com/juice-shop/multi-juicer/main/guides/digital-ocean/do-lb.yaml
+<span class="c"># paste the cert ID into the do-loadbalancer-certificate-id annotation</span>
+kubectl create -f do-lb.yaml</code></pre>
+    <p>Then add an <code>A</code> record for <code>mj.yourdomain.com</code> pointing at the LoadBalancer's public IP.</p>
+
+    <h3>Path B — Domain managed by Cloudflare</h3>
+    <p>Proxy the hostname through Cloudflare (trusted HTTPS at the edge) and put TLS on the origin LoadBalancer. Cloudflare's default <strong>Full</strong> SSL mode connects to the origin over HTTPS and accepts <em>any</em> certificate — including self-signed — so a self-signed cert is enough and you don't change any zone-wide setting.</p>
+    <p><strong>1.</strong> Create a self-signed origin certificate (key stays local):</p>
+    <pre><code>openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
+  -keyout key.pem -out cert.pem \
+  -subj "/CN=mj.yourdomain.com" \
+  -addext "subjectAltName=DNS:mj.yourdomain.com"</code></pre>
+    <p><strong>2.</strong> Upload it to DigitalOcean and note the ID:</p>
+    <pre><code>doctl compute certificate create --type custom --name mj-selfsigned \
+  --leaf-certificate-path cert.pem --private-key-path key.pem
+doctl compute certificate list</code></pre>
+    <p><strong>3.</strong> Create the LoadBalancer with HTTP + 443 listeners (<code>do-lb-cloudflare-tls.yaml</code>), pasting your cert ID into the <code>do-loadbalancer-certificate-id</code> annotation and listing <code>443</code> under <code>do-loadbalancer-tls-ports</code>. Apply it:</p>
+    <pre><code>kubectl create -f do-lb-cloudflare-tls.yaml
+kubectl get svc multi-juicer-loadbalancer -w   <span class="c"># wait for the EXTERNAL-IP</span></code></pre>
+    <div class="callout">
+      <strong>Selector gotcha.</strong> The chart labels the pod <code>app.kubernetes.io/instance: multi-juicer-multi-juicer</code> (doubled), regardless of your release name. If the LoadBalancer never routes traffic, that label mismatch is the usual cause.
+    </div>
+    <p><strong>4.</strong> In Cloudflare, add an <code>A</code> record for <code>mj</code> pointing at the LoadBalancer IP, set to <strong>Proxied</strong> (orange cloud). Verify:</p>
+    <pre><code>curl -I https://mj.yourdomain.com/   <span class="c"># expect HTTP 200 over HTTPS</span></code></pre>
+
+    <h3>Optional — gate your workshop with Cloudflare Access</h3>
+    <p>For a private workshop, add a <a href="https://developers.cloudflare.com/cloudflare-one/applications/">Cloudflare Access</a> (Zero Trust) self-hosted application for the hostname with a one-time-PIN policy. Visitors then authenticate before the app loads: <strong>Visit URL → Enter email → Get code → MultiJuicer</strong>. (Access requires the record to be Proxied.)</p>
+
+    <h2 class="section-title"><span class="step-tag">Step 5</span> Run a workshop</h2>
+    <p>Share your URL. Each participant (after the Access login, if enabled) enters a team name, joins, and clicks <strong>Start Hacking</strong> to get their own isolated Juice Shop. You watch progress from the admin scoreboard at <code>/balancer</code>. Idle instances are put to sleep automatically to save resources.</p>
+
+  <h2 class="section-title"><span class="step-tag">Step 6</span> Tear it down</h2>
+    <div class="callout warn"><strong>💸 Don't skip this</strong> or you'll keep paying. Delete the LoadBalancer <em>before</em> the cluster so no orphaned LB is left behind.</div>
+    <pre><code>helm delete multi-juicer
+kubectl delete -f do-lb-cloudflare-tls.yaml   <span class="c"># or do-lb.yaml for Path A</span>
+doctl kubernetes cluster delete juicy-k8s
+doctl compute certificate delete &lt;cert-id&gt;</code></pre>
+    <p>Finally remove the DNS record, delete the Cloudflare Access application if you created one, and confirm in the console that no clusters or load balancers remain.</p>
+
+    <hr>
+    <p class="meta">Reference: <a href="https://github.com/juice-shop/multi-juicer">MultiJuicer repository</a> · <a href="https://github.com/juice-shop/multi-juicer/blob/main/guides/digital-ocean/digital-ocean.md">Official DigitalOcean guide</a></p>
+  </main>
+
+  <footer>
+    <div>&copy; Cycubix Ltd. All rights reserved.</div>
+    <div class="footer-links">
+      <a href="https://cycubix.com">cycubix.com</a>
+      <a href="/">Docs home</a>
+      <a href="https://github.com/Cycubix-LTD">GitHub</a>
+    </div>
+  </footer>
+</body>
+</html>
